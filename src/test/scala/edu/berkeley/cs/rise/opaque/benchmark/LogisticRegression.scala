@@ -21,23 +21,21 @@ import java.util.Random
 import scala.io.Source
 
 import breeze.linalg.DenseVector
-import breeze.linalg.squaredDistance
 import edu.berkeley.cs.rise.opaque.Utils
-import edu.berkeley.cs.rise.opaque.expressions.ClosestPoint.closestPoint
+import edu.berkeley.cs.rise.opaque.expressions.DotProduct.dot
 import edu.berkeley.cs.rise.opaque.expressions.VectorMultiply.vectormultiply
 import edu.berkeley.cs.rise.opaque.expressions.VectorSum
 import edu.berkeley.cs.rise.opaque.{SecurityLevel, Encrypted}
-
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 
-object KMeans {
+object LogisticRegression {
   val spark = SparkSession
     .builder()
-    .appName("BenchmarkKM")
+    .appName("BenchmarkLR")
     .getOrCreate()
 
   var numPartitions = spark.sparkContext.defaultParallelism
@@ -45,81 +43,63 @@ object KMeans {
   def data(
       spark: SparkSession,
       securityLevel: SecurityLevel,
-      numPartitions: Int
-  ): DataFrame = {
-    val data = Source.fromFile(s"/opt/data/km_opaque_41065/test_file_0")
+      numPartitions: Int)
+    : DataFrame = {
+    val data = Source.fromFile(s"/opt/data/lr_opaque_51072/test_file_0")
       .getLines()
-      .map(x => Row(x.split(" ").map(_.trim.toDouble)))
+      .map(x => {
+          val v = x.split(" ").map(_.trim.toDouble)
+          val last = v.last
+          val rest = v.init
+          Row(rest, last)
+        })
       .toArray
-    val schema = StructType(Seq(StructField("p", DataTypes.createArrayType(DoubleType))))
+    val schema = StructType(Seq(
+      StructField("x", DataTypes.createArrayType(DoubleType)),
+      StructField("y", DoubleType)))
 
     securityLevel.applyTo(
       spark.createDataFrame(spark.sparkContext.makeRDD(data, numPartitions), schema)
     )
   }
 
-  def train(
-      spark: SparkSession,
-      securityLevel: SecurityLevel,
-      numPartitions: Int,
-      K: Int,
-      convergeDist: Double
-  ): Array[Array[Double]] = {
+  def train(spark: SparkSession, securityLevel: SecurityLevel, numPartitions: Int)
+    : Array[Double] = {
     import spark.implicits._
+    val rand = new Random(42)
+    val D = 2   //keep consist with SecureSpark
+    val ITERATIONS = 3
+
     val vectorsum = new VectorSum
 
     val points = Utils.ensureCached(data(spark, securityLevel, numPartitions))
-    Utils.time("Read k-means data") { Utils.force(points) }
-
+    Utils.time("Generate logistic regression data") { Utils.force(points) }
     Utils.timeBenchmark(
       "distributed" -> (numPartitions > 1),
-      "query" -> "k-means",
-      "system" -> securityLevel.name
-    ) {
+      "query" -> "logistic regression",
+      "system" -> securityLevel.name) {
 
-      // Sample k random points.
-      // TODO: Assumes points are already permuted randomly.
-      var centroids = points.take(K).map(_.getSeq[Double](0).toArray)
-      var tempDist = 1.0
+      val w = DenseVector.fill(D) {2 * rand.nextDouble - 1}
 
-      var iter = 0
-      while (tempDist > convergeDist && iter < 5) {
-        iter += 1
-        val newCentroids = points
+      for (i <- 1 to ITERATIONS) {
+        val gradient = points
           .select(
-            closestPoint($"p", lit(centroids)).as("oldCentroid"),
-            $"p".as("centroidPartialSum"),
-            lit(1).as("centroidPartialCount")
-          )
-          .groupBy($"oldCentroid")
-          .agg(
-            vectorsum($"centroidPartialSum").as("centroidSum"),
-            sum($"centroidPartialCount").as("centroidCount")
-          )
-          .select(
-            $"oldCentroid",
-            vectormultiply($"centroidSum", (lit(1.0) / $"centroidCount")).as("newCentroid")
-          )
-          .collect
-
-        tempDist = 0.0
-        for (row <- newCentroids) {
-          tempDist += squaredDistance(
-            new DenseVector(row.getSeq[Double](0).toArray),
-            new DenseVector(row.getSeq[Double](1).toArray)
-          )
-        }
-
-        centroids = newCentroids.map(_.getSeq[Double](1).toArray)
+            vectormultiply(
+              $"x",
+              (lit(1.0) / (lit(1.0) + exp(-$"y" * dot(lit(w.toArray), $"x"))) - lit(1.0)) * $"y")
+              .as("v"))
+          .groupBy().agg(vectorsum($"v"))
+          .first().getSeq[Double](0).toArray
+        w -= new DenseVector(gradient)
       }
 
-      centroids
+      w.toArray
     }
   }
 
   def main(args: Array[String]): Unit = {
     Utils.initOpaqueSQL(spark, testing = true)
 
-    train(this.spark, Encrypted, this.numPartitions, 10, 0.3)
+    train(this.spark, Encrypted, this.numPartitions)
   }
 }

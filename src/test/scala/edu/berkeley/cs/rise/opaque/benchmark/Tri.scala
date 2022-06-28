@@ -19,80 +19,63 @@ package edu.berkeley.cs.rise.opaque.benchmark
 
 import edu.berkeley.cs.rise.opaque.Utils
 import edu.berkeley.cs.rise.opaque.{SecurityLevel, Encrypted}
-
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
 
-object PageRank {
+object Tri {
   val spark = SparkSession
     .builder()
-    .appName("BenchmarkPR")
+    .appName("BenchmarkTri")
     .getOrCreate()
 
   var numPartitions = spark.sparkContext.defaultParallelism
 
-  def run(
-      spark: SparkSession,
-      securityLevel: SecurityLevel,
-      numPartitions: Int
-  ): DataFrame = {
+  def run(spark: SparkSession, securityLevel: SecurityLevel, numPartitions: Int)
+    : Int = {
     import spark.implicits._
-    val inputSchema = StructType(
-      Seq(
-        StructField("src", IntegerType, false),
-        StructField("dst", IntegerType, false)
-      )
-    )
-    val data = 
+    val inputSchema = StructType(Seq(
+      StructField("src", IntegerType, false),
+      StructField("dst", IntegerType, false)))
+    println(s"$numPartitions")
+    var data =
       Utils.ensureCached(
         securityLevel.applyTo(
           spark.read
             .schema(inputSchema)
             .option("delimiter", " ")
-            .csv(s"/opt/data/pr_opaque_cit-Patents/test_file_0")
-        )
-      )
+            .csv(s"/opt/data/tri_opaque_soc-Slashdot0811/test_file_0")
+            .repartition(numPartitions)))
+    Utils.force(data)
 
-    Utils.time("load edges") { Utils.force(data) }
+    Utils.timeBenchmark(
+      "distributed" -> (numPartitions > 1),
+      "query" -> "tri",
+      "system" -> securityLevel.name) {
+      val graph =
+        data
+          .filter($"src" =!= $"dst")
+          .distinct()
+      Utils.ensureCached(graph)
 
-    val newV =
-      Utils.timeBenchmark(
-        "distributed" -> (numPartitions > 1),
-        "query" -> "pagerank",
-        "system" -> securityLevel.name,
-      ) {
-        val links = 
-          Utils.ensureCached(
-            data
-              .distinct()
-              .select($"src", $"dst")
-          )
+      val graph1 = graph.select($"src".as("src1"), $"dst".as("dst1"))
+      val tmp = graph.select($"src".as("keya0"), $"dst".as("keya1"), lit(1.0f).as("cons"))
 
-        var ranks = links
-          .groupBy($"src")
-          .agg(
-            count(lit(1)).as("size")
-          )
-          .select($"src".as("id"), $"size", lit(1.0).as("weight"))
+      val com = graph.join(graph1, $"src" === $"src1")
+      val newcom = com.select($"dst".as("keyb0"), $"dst1".as("keyb1"), $"src", $"dst", $"dst1")
 
-        val result =
-          links
-            .join(ranks, $"id" === $"src")
-            .select($"dst", ($"weight" / $"size").as("weightedRank"))
-            .groupBy("dst")
-            .agg(sum("weightedRank").as("totalIncomingRank"))
-            .select($"dst", (lit(0.15) + lit(0.85) * $"totalIncomingRank").as("rank"))
-        Utils.force(result)
-        result
-      }
-    newV
+      val c = newcom.join(tmp, $"keya0" === $"keyb0" && $"keya1" === $"keyb1")
+        .count()
+
+      println(s"count=${c}")
+    }
+    0
   }
 
   def main(args: Array[String]): Unit = {
     Utils.initOpaqueSQL(spark, testing = true)
 
-    run(this.spark, Encrypted, this.numPartitions).collect.toSet
+    run(this.spark, Encrypted, this.numPartitions)
   }
 }

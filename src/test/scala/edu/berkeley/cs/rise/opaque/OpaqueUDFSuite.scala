@@ -21,7 +21,7 @@ import java.util.Random
 
 import org.apache.spark.sql.functions._
 
-import edu.berkeley.cs.rise.opaque.execution.udfs.LogisticRegression
+//import edu.berkeley.cs.rise.opaque.execution.udfs.LogisticRegression
 
 import edu.berkeley.cs.rise.opaque.benchmark._
 import edu.berkeley.cs.rise.opaque.expressions.DotProduct.dot
@@ -38,113 +38,108 @@ import org.apache.spark.sql.functions._
 trait OpaqueUDFSuite extends OpaqueSuiteBase {
   import spark.implicits._
 
-  test("exp") {
-    checkAnswer() { sl =>
-      val data: Seq[(Double, Double)] = Seq((2.0, 3.0))
-      val df = makeDF(data, sl, "x", "y")
-      df.select(exp($"y"))
-    }
-  }
+  // test("exp") {
+  //   checkAnswer() { sl =>
+  //     val data: Seq[(Double, Double)] = Seq((2.0, 3.0))
+  //     val df = makeDF(data, sl, "x", "y")
+  //     df.select(exp($"y"))
+  //   }
+  // }
 
-  test("vector multiply") {
-    checkAnswer() { sl =>
-      val data: Seq[(Array[Double], Double)] = Seq((Array[Double](1.0, 1.0, 1.0), 3.0))
-      val df = makeDF(data, sl, "v", "c")
-      df.select(vectormultiply($"v", $"c"))
-    }
-  }
+  // test("vector multiply") {
+  //   checkAnswer() { sl =>
+  //     val data: Seq[(Array[Double], Double)] = Seq((Array[Double](1.0, 1.0, 1.0), 3.0))
+  //     val df = makeDF(data, sl, "v", "c")
+  //     df.select(vectormultiply($"v", $"c"))
+  //   }
+  // }
 
-  test("dot product") {
-    checkAnswer() { sl =>
-      val data: Seq[(Array[Double], Array[Double])] =
-        Seq((Array[Double](1.0, 1.0, 1.0), Array[Double](1.0, 1.0, 1.0)))
-      val df = makeDF(data, sl, "v1", "v2")
-      df.select(dot($"v1", $"v2"))
-    }
-  }
+  // test("dot product") {
+  //   checkAnswer() { sl =>
+  //     val data: Seq[(Array[Double], Array[Double])] =
+  //       Seq((Array[Double](1.0, 1.0, 1.0), Array[Double](1.0, 1.0, 1.0)))
+  //     val df = makeDF(data, sl, "v1", "v2")
+  //     df.select(dot($"v1", $"v2"))
+  //   }
+  // }
 
-  test("vector sum") {
-    checkAnswer() { sl =>
-      val data: Seq[(Array[Double], Double)] =
-        Seq((Array[Double](1.0, 2.0, 3.0), 4.0), (Array[Double](5.0, 7.0, 7.0), 8.0))
-      val df = makeDF(data, sl, "v", "c")
-      val vectorsum = new VectorSum
-      df.groupBy().agg(vectorsum($"v"))
-    }
-  }
+  // test("vector sum") {
+  //   checkAnswer() { sl =>
+  //     val data: Seq[(Array[Double], Double)] =
+  //       Seq((Array[Double](1.0, 2.0, 3.0), 4.0), (Array[Double](5.0, 7.0, 7.0), 8.0))
+  //     val df = makeDF(data, sl, "v", "c")
+  //     val vectorsum = new VectorSum
+  //     df.groupBy().agg(vectorsum($"v"))
+  //   }
+  // }
 
-  test("least squares") {
-    checkAnswer() { sl =>
-      LeastSquares.query(spark, sl, "tiny", numPartitions)
-    }
-  }
+  // test("least squares") {
+  //   checkAnswer() { sl =>
+  //     LeastSquares.query(spark, sl, "tiny", numPartitions)
+  //   }
+  // }
 
-  test("logistic regression") {
-    checkAnswer() { sl =>
-      def generateData(
-          spark: SparkSession,
-          sl: SecurityLevel,
-          N: Int,
-          D: Int,
-          R: Double
-      ): DataFrame = {
-        val rand = new Random(42)
-        def generatePoint(i: Int): (Array[Double], Double) = {
-          val y = if (i % 2 == 0) 0 else 1
-          val x = Array.fill(D) { rand.nextGaussian + y * R }
-          (x, y)
-        }
+  // test("logistic regression") {
+  //   checkAnswer() { sl =>
+  //     def generateData(
+  //         spark: SparkSession,
+  //         sl: SecurityLevel,
+  //         N: Int,
+  //         D: Int,
+  //         R: Double
+  //     ): DataFrame = {
+  //       val rand = new Random(42)
+  //       def generatePoint(i: Int): (Array[Double], Double) = {
+  //         val y = if (i % 2 == 0) 0 else 1
+  //         val x = Array.fill(D) { rand.nextGaussian + y * R }
+  //         (x, y)
+  //       }
 
-        val data = Array.tabulate(N)(generatePoint)
-        val schema = StructType(
-          Seq(
-            StructField("x", DataTypes.createArrayType(DoubleType)),
-            StructField("y", DoubleType)
-          )
-        )
+  //       val data = Array.tabulate(N)(generatePoint)
+  //       val schema = StructType(
+  //         Seq(
+  //           StructField("x", DataTypes.createArrayType(DoubleType)),
+  //           StructField("y", DoubleType)
+  //         )
+  //       )
 
-        sl.applyTo(
-          spark.createDataFrame(spark.sparkContext.makeRDD(data.map(Row.fromTuple)), schema)
-        )
-      }
-      checkAnswer() { sl =>
-        val N = 1000
-        val D = 5
-        val R = 0.7
-        val A = 0.1
-        val ITERATIONS = 1
+  //       sl.applyTo(
+  //         spark.createDataFrame(spark.sparkContext.makeRDD(data.map(Row.fromTuple)), schema)
+  //       )
+  //     }
+  //     checkAnswer() { sl =>
+  //       val N = 1000
+  //       val D = 5
+  //       val R = 0.7
+  //       val A = 0.1
+  //       val ITERATIONS = 1
 
-        val trainingData =
-          Utils.ensureCached(generateData(spark, sl, N, D, R))
-        val w = LogisticRegression.train(spark, D, A, ITERATIONS, trainingData)
+  //       val trainingData =
+  //         Utils.ensureCached(generateData(spark, sl, N, D, R))
+  //       val w = LogisticRegression.train(spark, D, A, ITERATIONS, trainingData)
 
-        val evalData = generateData(spark, sl, N, D, R).drop("y")
-        LogisticRegression.predict(spark, w, evalData)
-      }
-    }
-  }
+  //       val evalData = generateData(spark, sl, N, D, R).drop("y")
+  //       LogisticRegression.predict(spark, w, evalData)
+  //     }
+  //   }
+  // }
 
-  test("prepare") {
-    checkAnswer(ignore = true) { sl =>
-      val df =
-        makeDF({ for (i <- 1 to 100) yield (i, -i, 0.25, i % 2) }, sl, "a", "b", "c", "d")
-      LogisticRegression.prepare(Seq("a", "b", "c"), Some("d"), df)
-    }
+  // test("prepare") {
+  //   checkAnswer(ignore = true) { sl =>
+  //     val df =
+  //       makeDF({ for (i <- 1 to 100) yield (i, -i, 0.25, i % 2) }, sl, "a", "b", "c", "d")
+  //     LogisticRegression.prepare(Seq("a", "b", "c"), Some("d"), df)
+  //   }
 
-    checkAnswer() { sl =>
-      val df =
-        makeDF({ for (i <- 1 to 100) yield (i, -i, 0.25, i % 2) }, sl, "a", "b", "c", "d")
-      LogisticRegression.prepare(Seq("a", "b"), None, df)
-    }
-  }
+  //   checkAnswer() { sl =>
+  //     val df =
+  //       makeDF({ for (i <- 1 to 100) yield (i, -i, 0.25, i % 2) }, sl, "a", "b", "c", "d")
+  //     LogisticRegression.prepare(Seq("a", "b"), None, df)
+  //   }
+  // }
 
-  test("k-means") {
-    checkAnswer() { sl =>
-      KMeans.train(spark, sl, numPartitions, 10, 2, 3, 0.01).sortBy(_(0))
-    }
-  }
 }
 
 class SinglePartitionOpaqueUDFSuite extends OpaqueUDFSuite with SinglePartitionSparkSession {}
 
-class MultiplePartitionOpaqueUDFSuite extends OpaqueUDFSuite with MultiplePartitionSparkSession {}
+//class MultiplePartitionOpaqueUDFSuite extends OpaqueUDFSuite with MultiplePartitionSparkSession {}

@@ -19,80 +19,65 @@ package edu.berkeley.cs.rise.opaque.benchmark
 
 import edu.berkeley.cs.rise.opaque.Utils
 import edu.berkeley.cs.rise.opaque.{SecurityLevel, Encrypted}
-
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
 
-object PageRank {
+object TC {
   val spark = SparkSession
     .builder()
-    .appName("BenchmarkPR")
+    .appName("BenchmarkTC")
     .getOrCreate()
 
   var numPartitions = spark.sparkContext.defaultParallelism
 
-  def run(
-      spark: SparkSession,
-      securityLevel: SecurityLevel,
-      numPartitions: Int
-  ): DataFrame = {
+  def run(spark: SparkSession, securityLevel: SecurityLevel, numPartitions: Int)
+    : Int = {
     import spark.implicits._
-    val inputSchema = StructType(
-      Seq(
-        StructField("src", IntegerType, false),
-        StructField("dst", IntegerType, false)
-      )
-    )
-    val data = 
+    val inputSchema = StructType(Seq(
+      StructField("src", IntegerType, false),
+      StructField("dst", IntegerType, false)))
+    println(s"$numPartitions")
+    var data =
       Utils.ensureCached(
         securityLevel.applyTo(
           spark.read
             .schema(inputSchema)
             .option("delimiter", " ")
-            .csv(s"/opt/data/pr_opaque_cit-Patents/test_file_0")
-        )
-      )
+            .csv(s"/opt/data/tc_opaque_fb/test_file_0")
+            .repartition(numPartitions)))
+    Utils.force(data)
 
-    Utils.time("load edges") { Utils.force(data) }
-
-    val newV =
-      Utils.timeBenchmark(
-        "distributed" -> (numPartitions > 1),
-        "query" -> "pagerank",
-        "system" -> securityLevel.name,
-      ) {
-        val links = 
-          Utils.ensureCached(
-            data
-              .distinct()
-              .select($"src", $"dst")
-          )
-
-        var ranks = links
-          .groupBy($"src")
-          .agg(
-            count(lit(1)).as("size")
-          )
-          .select($"src".as("id"), $"size", lit(1.0).as("weight"))
-
-        val result =
-          links
-            .join(ranks, $"id" === $"src")
-            .select($"dst", ($"weight" / $"size").as("weightedRank"))
-            .groupBy("dst")
-            .agg(sum("weightedRank").as("totalIncomingRank"))
-            .select($"dst", (lit(0.15) + lit(0.85) * $"totalIncomingRank").as("rank"))
-        Utils.force(result)
-        result
+    Utils.timeBenchmark(
+      "distributed" -> (numPartitions > 1),
+      "query" -> "tc",
+      "system" -> securityLevel.name) {
+      val edges =
+        data
+          .distinct()
+          .select($"dst".as("src1"), $"src".as("dst1"))
+      var oldCount = 0L
+      var nextCount = data.count()
+      var iter = 0
+      while (nextCount != oldCount && iter < 5) {
+        iter += 1
+        oldCount = nextCount
+        data = data.union(
+          data.join(edges, $"src" === $"src1")
+            .select($"dst1".as("src"), $"dst"))
+          .distinct()
+        Utils.ensureCached(data)
+        nextCount = data.count()
       }
-    newV
+      println(s"count=${nextCount}")
+    }
+    0
   }
 
   def main(args: Array[String]): Unit = {
     Utils.initOpaqueSQL(spark, testing = true)
 
-    run(this.spark, Encrypted, this.numPartitions).collect.toSet
+    run(this.spark, Encrypted, this.numPartitions)
   }
 }

@@ -91,7 +91,7 @@ assemblyShadeRules in (Test, assembly) := commonShadeRules
 testOptions in Test += Tests.Argument("-oF")
 
 lazy val commonJavaOptions =
-  Seq("-Xmx4096m", "-XX:ReservedCodeCacheSize=384m")
+  Seq("-Xmx128G", "-XX:ReservedCodeCacheSize=1G")
 Test / javaOptions := commonJavaOptions
 run / javaOptions := commonJavaOptions ++ Seq("-Dspark.master=local[1]")
 
