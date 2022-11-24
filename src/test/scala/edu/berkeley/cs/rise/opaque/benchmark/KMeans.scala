@@ -47,7 +47,11 @@ object KMeans {
       securityLevel: SecurityLevel,
       numPartitions: Int
   ): DataFrame = {
-    val data = Source.fromFile(s"/opt/data/km_opaque_41065/test_file_0")
+    // val data = Source.fromFile(s"/opt/data/km_opaque_41065/test_file_0")
+    //   .getLines()
+    //   .map(x => Row(x.split(" ").map(_.trim.toDouble)))
+    //   .toArray
+    val data = Source.fromFile(s"/opt/data/small_data/km_opaque_50000_5.txt")
       .getLines()
       .map(x => Row(x.split(" ").map(_.trim.toDouble)))
       .toArray

@@ -44,15 +44,30 @@ object MM {
       StructField("r", IntegerType, false),
       StructField("c", IntegerType, false),
       StructField("v", DoubleType, false)))
+    // val d0 =
+    //   Utils.ensureCached(
+    //     securityLevel.applyTo(
+    //       spark.read
+    //         .schema(inputSchema)
+    //         .option("delimiter", " ")
+    //         .csv(s"/opt/data/mm_opaque_a_2000_20/test_file_0")
+    //         .repartition(numPartitions)))
+    // val d1 =
+    //   Utils.ensureCached(
+    //     securityLevel.applyTo(
+    //       spark.read
+    //         .schema(inputSchema)
+    //         .option("delimiter", " ")
+    //         .csv(s"/opt/data/mm_opaque_b_20_2000/test_file_0")
+    //         .repartition(numPartitions)))
     val d0 =
       Utils.ensureCached(
         securityLevel.applyTo(
           spark.read
             .schema(inputSchema)
             .option("delimiter", " ")
-            .csv(s"/opt/data/mm_opaque_a_2000_20/test_file_0")
+            .csv(s"/opt/data/small_data/mm_opaque_a_100.txt")
             .repartition(numPartitions)))
-    Utils.force(d0)
 
     val d1 =
       Utils.ensureCached(
@@ -60,8 +75,9 @@ object MM {
           spark.read
             .schema(inputSchema)
             .option("delimiter", " ")
-            .csv(s"/opt/data/mm_opaque_b_20_2000/test_file_0")
+            .csv(s"/opt/data/small_data/mm_opaque_b_100.txt")
             .repartition(numPartitions)))
+    Utils.force(d0)
     Utils.force(d1)
 
     Utils.timeBenchmark(

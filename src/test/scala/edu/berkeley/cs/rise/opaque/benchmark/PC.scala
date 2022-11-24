@@ -70,9 +70,13 @@ object PC {
     : Int = {
     import spark.implicits._
 
-    val d0 = Utils.ensureCached(data(spark, securityLevel, "pe_opaque_a_108/test_file_0", numPartitions))
+    // val d0 = Utils.ensureCached(data(spark, securityLevel, "pe_opaque_a_107/test_file_0", numPartitions))
+    //   .select($"id", $"r".as("ra"))
+    // val d1 = Utils.ensureCached(data(spark, securityLevel, "pe_opaque_b_107/test_file_0", numPartitions))
+    //   .select($"id", $"r".as("rb"))
+    val d0 = Utils.ensureCached(data(spark, securityLevel, "small_data/pe_opaque_a_105.txt", numPartitions))
       .select($"id", $"r".as("ra"))
-    val d1 = Utils.ensureCached(data(spark, securityLevel, "pe_opaque_b_108/test_file_0", numPartitions))
+    val d1 = Utils.ensureCached(data(spark, securityLevel, "small_data/pe_opaque_b_105.txt", numPartitions))
       .select($"id", $"r".as("rb"))
     Utils.time("read pearson data a") { Utils.force(d0) }
     Utils.time("read pearson data b") { Utils.force(d1) }

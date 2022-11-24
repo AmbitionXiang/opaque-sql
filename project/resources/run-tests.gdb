@@ -5,5 +5,5 @@ commands
 bt
 c
 end
-r -Xmx128G org.scalatest.run edu.berkeley.cs.rise.opaque.SinglePartitionJoinSuite
+r -Xmx32G org.scalatest.run edu.berkeley.cs.rise.opaque.SinglePartitionJoinSuite
 bt

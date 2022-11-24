@@ -39,14 +39,23 @@ object TC {
       StructField("src", IntegerType, false),
       StructField("dst", IntegerType, false)))
     println(s"$numPartitions")
+    // var data =
+    //   Utils.ensureCached(
+    //     securityLevel.applyTo(
+    //       spark.read
+    //         .schema(inputSchema)
+    //         .option("delimiter", " ")
+    //         .csv(s"/opt/data/tc_opaque_fb/test_file_0")
+    //         .repartition(numPartitions)))
     var data =
       Utils.ensureCached(
         securityLevel.applyTo(
           spark.read
             .schema(inputSchema)
             .option("delimiter", " ")
-            .csv(s"/opt/data/tc_opaque_fb/test_file_0")
+            .csv(s"/opt/data/small_data/tc_opaque_2.txt")
             .repartition(numPartitions)))
+
     Utils.force(data)
 
     Utils.timeBenchmark(

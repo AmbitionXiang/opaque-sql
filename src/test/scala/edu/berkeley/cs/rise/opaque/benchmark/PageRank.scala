@@ -37,7 +37,7 @@ object PageRank {
       spark: SparkSession,
       securityLevel: SecurityLevel,
       numPartitions: Int
-  ): DataFrame = {
+  ): Int = {
     import spark.implicits._
     val inputSchema = StructType(
       Seq(
@@ -45,54 +45,64 @@ object PageRank {
         StructField("dst", IntegerType, false)
       )
     )
+    // val data = 
+    //   Utils.ensureCached(
+    //     securityLevel.applyTo(
+    //       spark.read
+    //         .schema(inputSchema)
+    //         .option("delimiter", " ")
+    //         .csv(s"/opt/data/pr_opaque_cit-Patents/test_file_0")
+    //     )
+    //   )
+
     val data = 
       Utils.ensureCached(
         securityLevel.applyTo(
           spark.read
             .schema(inputSchema)
             .option("delimiter", " ")
-            .csv(s"/opt/data/pr_opaque_cit-Patents/test_file_0")
+            .csv(s"/opt/data/small_data/pr_opaque.txt")
         )
       )
 
     Utils.time("load edges") { Utils.force(data) }
 
-    val newV =
-      Utils.timeBenchmark(
-        "distributed" -> (numPartitions > 1),
-        "query" -> "pagerank",
-        "system" -> securityLevel.name,
-      ) {
-        val links = 
-          Utils.ensureCached(
-            data
-              .distinct()
-              .select($"src", $"dst")
-          )
+    Utils.timeBenchmark(
+      "distributed" -> (numPartitions > 1),
+      "query" -> "pagerank",
+      "system" -> securityLevel.name,
+    ) {
+      val links = 
+        Utils.ensureCached(
+          data
+            .distinct()
+            .select($"src", $"dst")
+        )
 
-        var ranks = links
-          .groupBy($"src")
-          .agg(
-            count(lit(1)).as("size")
-          )
-          .select($"src".as("id"), $"size", lit(1.0).as("weight"))
+      var ranks = links
+        .groupBy($"src")
+        .agg(
+          count(lit(1)).as("size")
+        )
+        .select($"src".as("id"), $"size", lit(1.0).as("weight"))
 
-        val result =
-          links
-            .join(ranks, $"id" === $"src")
-            .select($"dst", ($"weight" / $"size").as("weightedRank"))
-            .groupBy("dst")
-            .agg(sum("weightedRank").as("totalIncomingRank"))
-            .select($"dst", (lit(0.15) + lit(0.85) * $"totalIncomingRank").as("rank"))
-        Utils.force(result)
-        result
-      }
-    newV
+      val result =
+        links
+          .join(ranks, $"id" === $"src")
+          .select($"dst", ($"weight" / $"size").as("weightedRank"))
+          .groupBy("dst")
+          .agg(sum("weightedRank").as("totalIncomingRank"))
+          .select($"dst", (lit(0.15) + lit(0.85) * $"totalIncomingRank").as("rank"))
+      Utils.force(result)
+
+      result.collect.toSet
+    }
+    0
   }
 
   def main(args: Array[String]): Unit = {
     Utils.initOpaqueSQL(spark, testing = true)
 
-    run(this.spark, Encrypted, this.numPartitions).collect.toSet
+    run(this.spark, Encrypted, this.numPartitions)
   }
 }

@@ -32,7 +32,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 
-object LogisticRegression {
+object LR {
   val spark = SparkSession
     .builder()
     .appName("BenchmarkLR")
@@ -45,7 +45,16 @@ object LogisticRegression {
       securityLevel: SecurityLevel,
       numPartitions: Int)
     : DataFrame = {
-    val data = Source.fromFile(s"/opt/data/lr_opaque_51072/test_file_0")
+    // val data = Source.fromFile(s"/opt/data/lr_opaque_51072/test_file_0")
+    //   .getLines()
+    //   .map(x => {
+    //       val v = x.split(" ").map(_.trim.toDouble)
+    //       val last = v.last
+    //       val rest = v.init
+    //       Row(rest, last)
+    //     })
+    //   .toArray
+    val data = Source.fromFile(s"/opt/data/small_data/lr_opaque_1062.txt")
       .getLines()
       .map(x => {
           val v = x.split(" ").map(_.trim.toDouble)

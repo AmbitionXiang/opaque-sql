@@ -39,13 +39,21 @@ object Tri {
       StructField("src", IntegerType, false),
       StructField("dst", IntegerType, false)))
     println(s"$numPartitions")
+    // var data =
+    //   Utils.ensureCached(
+    //     securityLevel.applyTo(
+    //       spark.read
+    //         .schema(inputSchema)
+    //         .option("delimiter", " ")
+    //         .csv(s"/opt/data/tri_opaque_soc-Slashdot0811/test_file_0")
+    //         .repartition(numPartitions)))
     var data =
       Utils.ensureCached(
         securityLevel.applyTo(
           spark.read
             .schema(inputSchema)
             .option("delimiter", " ")
-            .csv(s"/opt/data/tri_opaque_soc-Slashdot0811/test_file_0")
+            .csv(s"/opt/data/small_data/tc_opaque_7.txt")
             .repartition(numPartitions)))
     Utils.force(data)
 
